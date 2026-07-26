@@ -1,31 +1,4 @@
-/*
-    Copyright (c) 2007-2016 Contributors as noted in the AUTHORS file
-
-    This file is part of libzmq, the ZeroMQ core engine in C++.
-
-    libzmq is free software; you can redistribute it and/or modify it under
-    the terms of the GNU Lesser General Public License (LGPL) as published
-    by the Free Software Foundation; either version 3 of the License, or
-    (at your option) any later version.
-
-    As a special exception, the Contributors give you permission to link
-    this library with independent modules to produce an executable,
-    regardless of the license terms of these independent modules, and to
-    copy and distribute the resulting executable under terms of your choice,
-    provided that you also meet, for each linked independent module, the
-    terms and conditions of the license of that module. An independent
-    module is a module which is not derived from or based on this library.
-    If you modify this library, you must extend this exception to your
-    version of the library.
-
-    libzmq is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-    License for more details.
-
-    You should have received a copy of the GNU Lesser General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* SPDX-License-Identifier: MPL-2.0 */
 
 #ifndef __ZMQ_ATOMIC_COUNTER_HPP_INCLUDED__
 #define __ZMQ_ATOMIC_COUNTER_HPP_INCLUDED__
@@ -81,9 +54,9 @@ namespace zmq
 //  mutexes).
 
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_ARM64))
-class __declspec(align (8)) atomic_counter_t
+class __declspec (align (8)) atomic_counter_t
 #elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_ARM_ARMV7VE))
-class __declspec(align (4)) atomic_counter_t
+class __declspec (align (4)) atomic_counter_t
 #else
 class atomic_counter_t
 #endif
@@ -113,23 +86,23 @@ class atomic_counter_t
 #elif defined ZMQ_ATOMIC_COUNTER_TILE
         old_value = arch_atomic_add (&_value, increment_);
 #elif defined ZMQ_ATOMIC_COUNTER_X86
-        __asm__ volatile("lock; xadd %0, %1 \n\t"
-                         : "=r"(old_value), "=m"(_value)
-                         : "0"(increment_), "m"(_value)
-                         : "cc", "memory");
+        __asm__ volatile ("lock; xadd %0, %1 \n\t"
+                          : "=r"(old_value), "=m"(_value)
+                          : "0"(increment_), "m"(_value)
+                          : "cc", "memory");
 #elif defined ZMQ_ATOMIC_COUNTER_ARM
         integer_t flag, tmp;
-        __asm__ volatile("       dmb     sy\n\t"
-                         "1:     ldrex   %0, [%5]\n\t"
-                         "       add     %2, %0, %4\n\t"
-                         "       strex   %1, %2, [%5]\n\t"
-                         "       teq     %1, #0\n\t"
-                         "       bne     1b\n\t"
-                         "       dmb     sy\n\t"
-                         : "=&r"(old_value), "=&r"(flag), "=&r"(tmp),
-                           "+Qo"(_value)
-                         : "Ir"(increment_), "r"(&_value)
-                         : "cc");
+        __asm__ volatile ("       dmb     sy\n\t"
+                          "1:     ldrex   %0, [%5]\n\t"
+                          "       add     %2, %0, %4\n\t"
+                          "       strex   %1, %2, [%5]\n\t"
+                          "       teq     %1, #0\n\t"
+                          "       bne     1b\n\t"
+                          "       dmb     sy\n\t"
+                          : "=&r"(old_value), "=&r"(flag), "=&r"(tmp),
+                            "+Qo"(_value)
+                          : "Ir"(increment_), "r"(&_value)
+                          : "cc");
 #elif defined ZMQ_ATOMIC_COUNTER_MUTEX
         sync.lock ();
         old_value = _value;
@@ -167,24 +140,24 @@ class atomic_counter_t
 #elif defined ZMQ_ATOMIC_COUNTER_X86
         integer_t oldval = -decrement_;
         volatile integer_t *val = &_value;
-        __asm__ volatile("lock; xaddl %0,%1"
-                         : "=r"(oldval), "=m"(*val)
-                         : "0"(oldval), "m"(*val)
-                         : "cc", "memory");
+        __asm__ volatile ("lock; xaddl %0,%1"
+                          : "=r"(oldval), "=m"(*val)
+                          : "0"(oldval), "m"(*val)
+                          : "cc", "memory");
         return oldval != decrement_;
 #elif defined ZMQ_ATOMIC_COUNTER_ARM
         integer_t old_value, flag, tmp;
-        __asm__ volatile("       dmb     sy\n\t"
-                         "1:     ldrex   %0, [%5]\n\t"
-                         "       sub     %2, %0, %4\n\t"
-                         "       strex   %1, %2, [%5]\n\t"
-                         "       teq     %1, #0\n\t"
-                         "       bne     1b\n\t"
-                         "       dmb     sy\n\t"
-                         : "=&r"(old_value), "=&r"(flag), "=&r"(tmp),
-                           "+Qo"(_value)
-                         : "Ir"(decrement_), "r"(&_value)
-                         : "cc");
+        __asm__ volatile ("       dmb     sy\n\t"
+                          "1:     ldrex   %0, [%5]\n\t"
+                          "       sub     %2, %0, %4\n\t"
+                          "       strex   %1, %2, [%5]\n\t"
+                          "       teq     %1, #0\n\t"
+                          "       bne     1b\n\t"
+                          "       dmb     sy\n\t"
+                          : "=&r"(old_value), "=&r"(flag), "=&r"(tmp),
+                            "+Qo"(_value)
+                          : "Ir"(decrement_), "r"(&_value)
+                          : "cc");
         return old_value - decrement_ != 0;
 #elif defined ZMQ_ATOMIC_COUNTER_MUTEX
         sync.lock ();

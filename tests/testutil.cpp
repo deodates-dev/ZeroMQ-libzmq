@@ -1,31 +1,4 @@
-/*
-    Copyright (c) 2007-2019 Contributors as noted in the AUTHORS file
-
-    This file is part of libzmq, the ZeroMQ core engine in C++.
-
-    libzmq is free software; you can redistribute it and/or modify it under
-    the terms of the GNU Lesser General Public License (LGPL) as published
-    by the Free Software Foundation; either version 3 of the License, or
-    (at your option) any later version.
-
-    As a special exception, the Contributors give you permission to link
-    this library with independent modules to produce an executable,
-    regardless of the license terms of these independent modules, and to
-    copy and distribute the resulting executable under terms of your choice,
-    provided that you also meet, for each linked independent module, the
-    terms and conditions of the license of that module. An independent
-    module is a module which is not derived from or based on this library.
-    If you modify this library, you must extend this exception to your
-    version of the library.
-
-    libzmq is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-    License for more details.
-
-    You should have received a copy of the GNU Lesser General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "testutil.hpp"
 #include "testutil_unity.hpp"
 
@@ -34,7 +7,7 @@
 
 #if defined _WIN32
 #include "../src/windows.hpp"
-#if defined _MSC_VER
+#if defined ZMQ_HAVE_WINDOWS
 #if defined ZMQ_HAVE_IPC
 #include <direct.h>
 #include <afunix.h>
@@ -65,6 +38,12 @@
 #include <sys/types.h>
 #include <sys/socketvar.h>
 #endif
+#endif
+
+#if defined(ZMQ_HAVE_VSOCK)
+#include "linux/vm_sockets.h"
+#include <sys/ioctl.h>
+#include <fcntl.h>
 #endif
 
 #ifndef PATH_MAX
@@ -327,6 +306,33 @@ int is_tipc_available ()
 #endif // ZMQ_HAVE_TIPC
 }
 
+int is_vsock_available ()
+{
+#ifndef ZMQ_HAVE_VSOCK
+    return 0;
+#else
+    unsigned int cid = VMADDR_CID_ANY;
+    int vsock = -1;
+
+    if ((vsock = open ("/dev/vsock", O_RDONLY, 0)) < 0) {
+        TEST_IGNORE_MESSAGE ("failed to open /dev/vsock, skipping test");
+    } else if (ioctl (vsock, IOCTL_VM_SOCKETS_GET_LOCAL_CID, &cid) < 0) {
+        TEST_IGNORE_MESSAGE ("failed to get local cid, skipping test");
+    }
+
+    if (vsock >= 0) {
+        close (vsock);
+    }
+
+    if (cid == VMADDR_CID_ANY) {
+        TEST_IGNORE_MESSAGE (
+          "vsock_loopback environment unavailable, skipping test");
+    }
+
+    return cid != VMADDR_CID_ANY;
+#endif // ZMQ_HAVE_VSOCK
+}
+
 int test_inet_pton (int af_, const char *src_, void *dst_)
 {
 #if defined(ZMQ_HAVE_WINDOWS) && (_WIN32_WINNT < 0x0600)
@@ -358,7 +364,7 @@ sockaddr_in bind_bsd_socket (int socket_)
     struct sockaddr_in saddr;
     memset (&saddr, 0, sizeof (saddr));
     saddr.sin_family = AF_INET;
-    saddr.sin_addr.s_addr = INADDR_ANY;
+    saddr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
 #if !defined(_WIN32_WINNT) || (_WIN32_WINNT >= 0x0600)
     saddr.sin_port = 0;
 #else
@@ -518,15 +524,15 @@ fd_t bind_socket_resolve_port (const char *address_,
         addr_len = sizeof (struct sockaddr_storage);
         TEST_ASSERT_SUCCESS_RAW_ERRNO (
           getsockname (s_pre, (struct sockaddr *) &addr, &addr_len));
-        sprintf (my_endpoint_, "%s://%s:%u",
-                 protocol_ == IPPROTO_TCP   ? "tcp"
-                 : protocol_ == IPPROTO_UDP ? "udp"
-                 : protocol_ == IPPROTO_WSS ? "wss"
-                                            : "ws",
-                 address_,
-                 af_ == AF_INET
-                   ? ntohs ((*(struct sockaddr_in *) &addr).sin_port)
-                   : ntohs ((*(struct sockaddr_in6 *) &addr).sin6_port));
+        snprintf (
+          my_endpoint_, 6 + strlen (address_) + 7 * sizeof (char), "%s://%s:%u",
+          protocol_ == IPPROTO_TCP   ? "tcp"
+          : protocol_ == IPPROTO_UDP ? "udp"
+          : protocol_ == IPPROTO_WSS ? "wss"
+                                     : "ws",
+          address_,
+          af_ == AF_INET ? ntohs ((*(struct sockaddr_in *) &addr).sin_port)
+                         : ntohs ((*(struct sockaddr_in6 *) &addr).sin6_port));
     }
 
     return s_pre;

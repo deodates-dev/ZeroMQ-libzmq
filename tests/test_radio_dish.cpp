@@ -1,31 +1,4 @@
-/*
-    Copyright (c) 2007-2016 Contributors as noted in the AUTHORS file
-
-    This file is part of libzmq, the ZeroMQ core engine in C++.
-
-    libzmq is free software; you can redistribute it and/or modify it under
-    the terms of the GNU Lesser General Public License (LGPL) as published
-    by the Free Software Foundation; either version 3 of the License, or
-    (at your option) any later version.
-
-    As a special exception, the Contributors give you permission to link
-    this library with independent modules to produce an executable,
-    regardless of the license terms of these independent modules, and to
-    copy and distribute the resulting executable under terms of your choice,
-    provided that you also meet, for each linked independent module, the
-    terms and conditions of the license of that module. An independent
-    module is a module which is not derived from or based on this library.
-    If you modify this library, you must extend this exception to your
-    version of the library.
-
-    libzmq is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-    License for more details.
-
-    You should have received a copy of the GNU Lesser General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* SPDX-License-Identifier: MPL-2.0 */
 
 #include "testutil.hpp"
 #include "testutil_unity.hpp"
@@ -41,7 +14,10 @@
 
 // Helper macro to define the v4/v6 function pairs
 #define MAKE_TEST_V4V6(_test)                                                  \
-    static void _test##_ipv4 () { _test (false); }                             \
+    static void _test##_ipv4 ()                                                \
+    {                                                                          \
+        _test (false);                                                         \
+    }                                                                          \
                                                                                \
     static void _test##_ipv6 ()                                                \
     {                                                                          \
@@ -345,7 +321,7 @@ static bool is_multicast_available (int ipv6_)
         struct sockaddr_in *mcast_ipv4 = &mcast.ipv4;
 
         any_ipv4->sin_family = AF_INET;
-        any_ipv4->sin_port = htons (5555);
+        any_ipv4->sin_port = htons (port);
 
         rc = test_inet_pton (AF_INET, "0.0.0.0", &any_ipv4->sin_addr);
         if (rc == 0) {
@@ -419,15 +395,23 @@ static bool is_multicast_available (int ipv6_)
 
     msleep (SETTLE_TIME);
 
-    rc = sendto (send_sock, msg, static_cast<socklen_t> (strlen (msg)), 0,
+#ifdef ZMQ_HAVE_WINDOWS
+    rc = sendto (send_sock, msg, static_cast<int> (strlen (msg)), 0,
                  &mcast.generic, sl);
+#else
+    rc = sendto (send_sock, msg, strlen (msg), 0, &mcast.generic, sl);
+#endif
     if (rc < 0) {
         goto out;
     }
 
     msleep (SETTLE_TIME);
 
+#ifdef ZMQ_HAVE_WINDOWS
     rc = recvfrom (bind_sock, buf, sizeof (buf) - 1, 0, NULL, 0);
+#else
+    rc = recvfrom (bind_sock, buf, sizeof (buf) - 1, MSG_DONTWAIT, NULL, 0);
+#endif
     if (rc < 0) {
         goto out;
     }

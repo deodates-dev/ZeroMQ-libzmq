@@ -1,5 +1,5 @@
 # CMake build script for ZeroMQ unit tests
-cmake_minimum_required(VERSION "2.8.1")
+cmake_minimum_required(VERSION 2.8.1...3.31)
 
 set(unittests
     unittest_ypipe
@@ -41,6 +41,10 @@ foreach(test ${unittests})
   if(CMAKE_SYSTEM_NAME MATCHES "QNX")
     target_link_libraries(${test} socket)
     target_link_libraries(${test} m)
+  endif()
+
+  if (WITH_GSSAPI_KRB5)
+    target_link_libraries(${test} ${GSSAPI_KRB5_LIBRARIES})
   endif()
 
   if(WIN32)

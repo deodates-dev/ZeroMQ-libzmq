@@ -49,6 +49,10 @@ elif [ $CURVE == "libsodium" ]; then
     fi
 fi
 
+if [ "$GSSAPI" == "enabled" ]; then
+    CMAKE_OPTS+=("-DWITH_GSSAPI_KRB5=ON")
+fi
+
 CMAKE_PREFIXES=()
 MAKE_PREFIXES=()
 PARALLEL_MAKE_OPT="-j5"
@@ -86,6 +90,7 @@ mkdir build_cmake
 cd build_cmake
 if [ "$DO_CLANG_FORMAT_CHECK" = "1" ] ; then
     if ! ( PKG_CONFIG_PATH=${BUILD_PREFIX}/lib/pkgconfig cmake "${CMAKE_OPTS[@]}" .. && make clang-format-check) ; then
+        echo "clang-format version is: $(clang-format --version)"
         make clang-format-diff
         exit 1
     fi

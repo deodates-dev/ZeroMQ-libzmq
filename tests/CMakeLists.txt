@@ -1,5 +1,5 @@
 # CMake build script for ZeroMQ tests
-cmake_minimum_required(VERSION "2.8.1")
+cmake_minimum_required(VERSION 2.8.1...3.31)
 
 # On Windows: solution file will be called tests.sln
 project(tests)
@@ -64,6 +64,7 @@ set(tests
   test_srcfd
   test_stream_timeout
   test_xpub_manual
+  test_xpub_topic
   test_xpub_welcome_msg
   test_xpub_verbose
   test_base85
@@ -77,7 +78,7 @@ set(tests
   test_mock_pub_sub)
 
 if(NOT WIN32)
-  list(APPEND tests test_security_gssapi test_socks test_connect_null_fuzzer test_bind_null_fuzzer test_connect_fuzzer test_bind_fuzzer)
+  list(APPEND tests test_security_gssapi test_socks test_connect_null_fuzzer test_bind_null_fuzzer test_connect_fuzzer test_bind_fuzzer test_connect_stream_fuzzer test_bind_stream_fuzzer test_socket_options_fuzzer)
 endif()
 
 if(ZMQ_HAVE_CURVE)
@@ -114,6 +115,7 @@ if(NOT WIN32)
     test_proxy
     test_proxy_hwm
     test_proxy_single_socket
+    test_proxy_steerable
     test_proxy_terminate
     test_getsockopt_memset
     test_filter_ipc
@@ -150,6 +152,10 @@ if(WITH_VMCI)
   list(APPEND tests test_pair_vmci test_reqrep_vmci)
 endif()
 
+if(ZMQ_HAVE_VSOCK)
+  list(APPEND tests test_pair_vsock test_reqrep_vsock)
+endif()
+
 if(ENABLE_DRAFTS)
   list(
     APPEND
@@ -165,6 +171,7 @@ if(ENABLE_DRAFTS)
     test_router_notify
     test_xpub_manual_last_value
     test_peer
+    test_peer_disconnect
     test_msg_init
     test_channel
     test_hello_msg
@@ -186,6 +193,10 @@ endif()
 
 if(ZMQ_HAVE_WS)
   list(APPEND tests test_ws_transport)
+
+  if(NOT WIN32)
+    list(APPEND tests test_connect_ws_fuzzer test_bind_ws_fuzzer)
+  endif()
 
   if(ZMQ_HAVE_WSS)
     list(APPEND tests test_wss_transport)
@@ -260,7 +271,7 @@ endif()
 foreach(test ${tests})
   # target_sources not supported before CMake 3.1
   if(ZMQ_HAVE_CURVE AND ${test} MATCHES test_security_curve)
-    add_executable(${test} ${test}.cpp "../src/tweetnacl.c" "../src/err.cpp" "../src/random.cpp" "../src/clock.cpp")
+    add_executable(${test} ${test}.cpp "../src/err.cpp" "../src/random.cpp" "../src/clock.cpp")
   else()
     add_executable(${test} ${test}.cpp)
   endif()
@@ -277,13 +288,17 @@ foreach(test ${tests})
     endif()
   else()
     # per-test directories not generated on OS X / Darwin
-    if(NOT ${CMAKE_CXX_COMPILER_ID} MATCHES "Clang.*")
+    if(NOT APPLE)
       link_directories(${test} PRIVATE "${ZeroMQ_SOURCE_DIR}/../lib")
     endif()
   endif()
 
   if(RT_LIBRARY)
     target_link_libraries(${test} ${RT_LIBRARY})
+  endif()
+
+  if (WITH_GSSAPI_KRB5)
+    target_link_libraries(${test} ${GSSAPI_KRB5_LIBRARIES})
   endif()
 
   if(CMAKE_SYSTEM_NAME MATCHES "QNX")
@@ -306,6 +321,10 @@ foreach(test ${tests})
 
   set_tests_properties(${test} PROPERTIES TIMEOUT 10)
   set_tests_properties(${test} PROPERTIES SKIP_RETURN_CODE 77)
+
+  if(QNX)
+    install(TARGETS ${test} RUNTIME DESTINATION bin/)
+  endif()
 endforeach()
 
 # override timeout for these tests
@@ -318,11 +337,6 @@ endif()
 if(NOT CMAKE_SYSTEM_NAME MATCHES "Linux")
   if(ZMQ_HAVE_CURVE)
     set_tests_properties(test_security_curve PROPERTIES TIMEOUT 60)
-  endif()
-
-  # add additional required flags ZMQ_USE_TWEETNACL will already be defined when not using sodium
-  if(ZMQ_HAVE_CURVE AND NOT ZMQ_USE_TWEETNACL)
-    target_compile_definitions(test_security_curve PRIVATE "-DZMQ_USE_TWEETNACL")
   endif()
 endif()
 

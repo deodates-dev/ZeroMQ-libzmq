@@ -255,6 +255,12 @@ src_libzmq_la_SOURCES = \
 	src/vmci_connecter.hpp \
 	src/vmci_listener.cpp \
 	src/vmci_listener.hpp \
+	src/vsock_address.cpp \
+	src/vsock_address.hpp \
+	src/vsock_connecter.cpp \
+	src/vsock_connecter.hpp \
+	src/vsock_listener.cpp \
+	src/vsock_listener.hpp \
 	src/windows.hpp \
 	src/wire.hpp \
 	src/xpub.cpp \
@@ -281,12 +287,6 @@ if USE_WEPOLL
 src_libzmq_la_SOURCES += \
 	external/wepoll/wepoll.c \
 	external/wepoll/wepoll.h
-endif
-
-if USE_TWEETNACL
-src_libzmq_la_SOURCES += \
-	src/tweetnacl.c \
-	src/tweetnacl.h
 endif
 
 if HAVE_WS
@@ -489,6 +489,7 @@ test_apps = \
 	tests/test_issue_566 \
 	tests/test_proxy_hwm \
 	tests/test_proxy_single_socket \
+	tests/test_proxy_steerable \
 	tests/test_proxy_terminate \
 	tests/test_getsockopt_memset \
 	tests/test_setsockopt \
@@ -499,6 +500,7 @@ test_apps = \
 	tests/test_capabilities \
 	tests/test_xpub_nodrop \
 	tests/test_xpub_manual \
+	tests/test_xpub_topic \
 	tests/test_xpub_welcome_msg \
 	tests/test_xpub_verbose \
 	tests/test_atomics \
@@ -736,6 +738,10 @@ tests_test_proxy_single_socket_SOURCES = tests/test_proxy_single_socket.cpp
 tests_test_proxy_single_socket_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
 tests_test_proxy_single_socket_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
 
+tests_test_proxy_steerable_SOURCES = tests/test_proxy_steerable.cpp
+tests_test_proxy_steerable_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
+tests_test_proxy_steerable_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
+
 tests_test_proxy_terminate_SOURCES = tests/test_proxy_terminate.cpp
 tests_test_proxy_terminate_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
 tests_test_proxy_terminate_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
@@ -771,6 +777,10 @@ tests_test_xpub_nodrop_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
 tests_test_xpub_manual_SOURCES = tests/test_xpub_manual.cpp
 tests_test_xpub_manual_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
 tests_test_xpub_manual_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
+
+tests_test_xpub_topic_SOURCES = tests/test_xpub_topic.cpp
+tests_test_xpub_topic_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
+tests_test_xpub_topic_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
 
 tests_test_xpub_welcome_msg_SOURCES = tests/test_xpub_welcome_msg.cpp
 tests_test_xpub_welcome_msg_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
@@ -846,11 +856,6 @@ tests_test_security_curve_SOURCES = \
 	src/random.cpp \
 	src/err.hpp \
 	src/err.cpp
-
-if USE_TWEETNACL
-tests_test_security_curve_SOURCES += \
-	src/tweetnacl.c
-endif
 
 tests_test_security_curve_LDADD = \
         ${TESTUTIL_LIBS} src/libzmq.la $(LIBUNWIND_LIBS) $(LIBBSD_LIBS)
@@ -1048,6 +1053,19 @@ tests_test_reqrep_vmci_CXXFLAGS = @LIBZMQ_VMCI_CXXFLAGS@
 
 endif
 
+if BUILD_VSOCK
+test_apps += tests/test_pair_vsock tests/test_reqrep_vsock
+
+tests_test_pair_vsock_SOURCES = tests/test_pair_vsock.cpp
+tests_test_pair_vsock_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
+tests_test_pair_vsock_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
+
+tests_test_reqrep_vsock_SOURCES = tests/test_reqrep_vsock.cpp
+tests_test_reqrep_vsock_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
+tests_test_reqrep_vsock_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
+
+endif
+
 if ENABLE_DRAFTS
 test_apps += tests/test_poller \
 	tests/test_client_server \
@@ -1060,6 +1078,7 @@ test_apps += tests/test_poller \
 	tests/test_xpub_manual_last_value \
 	tests/test_router_notify \
 	tests/test_peer \
+	tests/test_peer_disconnect \
 	tests/test_reconnect_options \
 	tests/test_msg_init \
 	tests/test_hello_msg \
@@ -1113,6 +1132,10 @@ tests_test_router_notify_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
 tests_test_peer_SOURCES = tests/test_peer.cpp
 tests_test_peer_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
 tests_test_peer_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
+
+tests_test_peer_disconnect_SOURCES = tests/test_peer_disconnect.cpp
+tests_test_peer_disconnect_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
+tests_test_peer_disconnect_CPPFLAGS = ${TESTUTIL_CPPFLAGS}
 
 tests_test_reconnect_options_SOURCES = tests/test_reconnect_options.cpp
 tests_test_reconnect_options_LDADD = ${TESTUTIL_LIBS} src/libzmq.la
@@ -1419,6 +1442,11 @@ unittests_unittest_curve_encoding_LDADD =  \
         $(top_builddir)/src/.libs/libzmq.a \
         ${src_libzmq_la_LIBADD} \
         $(CODE_COVERAGE_LDFLAGS)
+
+if USE_LIBSODIUM
+unittests_unittest_curve_encoding_CPPFLAGS += ${sodium_CFLAGS}
+unittests_unittest_curve_encoding_LDADD += ${sodium_LIBS}
+endif
 endif
 
 check_PROGRAMS = ${test_apps}
@@ -1450,6 +1478,7 @@ EXTRA_DIST = \
 	autogen.sh	\
 	version.sh	\
 	ci_build.sh \
+	LICENSE \
 	src/libzmq.vers \
 	src/version.rc.in \
 	tests/CMakeLists.txt \

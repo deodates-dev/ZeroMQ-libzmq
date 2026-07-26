@@ -1,31 +1,4 @@
-/*
-    Copyright (c) 2021 Contributors as noted in the AUTHORS file
-
-    This file is part of libzmq, the ZeroMQ core engine in C++.
-
-    libzmq is free software; you can redistribute it and/or modify it under
-    the terms of the GNU Lesser General Public License (LGPL) as published
-    by the Free Software Foundation; either version 3 of the License, or
-    (at your option) any later version.
-
-    As a special exception, the Contributors give you permission to link
-    this library with independent modules to produce an executable,
-    regardless of the license terms of these independent modules, and to
-    copy and distribute the resulting executable under terms of your choice,
-    provided that you also meet, for each linked independent module, the
-    terms and conditions of the license of that module. An independent
-    module is a module which is not derived from or based on this library.
-    If you modify this library, you must extend this exception to your
-    version of the library.
-
-    libzmq is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-    License for more details.
-
-    You should have received a copy of the GNU Lesser General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* SPDX-License-Identifier: MPL-2.0 */
 
 // author: E. G. Patrick Bos, Netherlands eScience Center, 2021
 
@@ -73,7 +46,17 @@ void recv_string_expect_success_or_eagain (void *socket_,
 void test_ppoll_signals ()
 {
 #ifdef ZMQ_HAVE_PPOLL
+    size_t len = MAX_SOCKET_STRING;
+    char my_endpoint[MAX_SOCKET_STRING];
     pid_t child_pid;
+
+    /* Get a random TCP port first */
+    setup_test_context ();
+    void *sb = test_context_socket (ZMQ_REP);
+    bind_loopback (sb, 0, my_endpoint, len);
+    test_context_socket_close (sb);
+    teardown_test_context ();
+
     do {
         child_pid = fork ();
     } while (child_pid == -1); // retry if fork fails
@@ -85,7 +68,7 @@ void test_ppoll_signals ()
         int recv_timeout = 5000;
         TEST_ASSERT_SUCCESS_ERRNO (zmq_setsockopt (
           socket, ZMQ_RCVTIMEO, &recv_timeout, sizeof (recv_timeout)));
-        TEST_ASSERT_SUCCESS_ERRNO (zmq_bind (socket, "tcp://*:6660"));
+        TEST_ASSERT_SUCCESS_ERRNO (zmq_bind (socket, my_endpoint));
         // bind is on the master process to avoid zombie children to hold on to binds
 
         // first send a test message to check whether the signal mask is setup in the child process
@@ -102,6 +85,7 @@ void test_ppoll_signals ()
 
         // finish
         test_context_socket_close (socket);
+        teardown_test_context ();
 
         // wait for child
         int status = 0;
@@ -139,8 +123,7 @@ void test_ppoll_signals ()
         TEST_ASSERT_SUCCESS_ERRNO (sigaction (SIGTERM, &sa, NULL));
 
         void *socket = test_context_socket (ZMQ_REP);
-        TEST_ASSERT_SUCCESS_ERRNO (
-          zmq_connect (socket, "tcp://127.0.0.1:6660"));
+        TEST_ASSERT_SUCCESS_ERRNO (zmq_connect (socket, my_endpoint));
 
         zmq_pollitem_t pollitems[] = {
           {socket, 0, ZMQ_POLLIN, 0},
@@ -167,6 +150,7 @@ void test_ppoll_signals ()
         // wait before closing socket, so that parent has time to receive
         sleep (1);
         test_context_socket_close (socket);
+        teardown_test_context ();
         _Exit (0);
     }
 #else

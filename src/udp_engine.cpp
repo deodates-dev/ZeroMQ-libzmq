@@ -1,31 +1,4 @@
-/*
-Copyright (c) 2007-2016 Contributors as noted in the AUTHORS file
-
-This file is part of libzmq, the ZeroMQ core engine in C++.
-
-libzmq is free software; you can redistribute it and/or modify it under
-the terms of the GNU Lesser General Public License (LGPL) as published
-by the Free Software Foundation; either version 3 of the License, or
-(at your option) any later version.
-
-As a special exception, the Contributors give you permission to link
-this library with independent modules to produce an executable,
-regardless of the license terms of these independent modules, and to
-copy and distribute the resulting executable under terms of your choice,
-provided that you also meet, for each linked independent module, the
-terms and conditions of the license of that module. An independent
-module is a module which is not derived from or based on this library.
-If you modify this library, you must extend this exception to your
-version of the library.
-
-libzmq is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* SPDX-License-Identifier: MPL-2.0 */
 
 #include "precompiled.hpp"
 
@@ -195,7 +168,7 @@ void zmq::udp_engine_t::plug (io_thread_t *io_thread_, session_base_t *session_)
 #endif
         if (rc != 0) {
             assert_success_or_recoverable (_fd, rc);
-            error (connection_error);
+            error (protocol_error);
             return;
         }
 
@@ -368,8 +341,8 @@ void zmq::udp_engine_t::sockaddr_to_msg (zmq::msg_t *msg_,
 
     char port[6];
     const int port_len =
-      sprintf (port, "%d", static_cast<int> (ntohs (addr_->sin_port)));
-    zmq_assert (port_len > 0);
+      snprintf (port, 6, "%d", static_cast<int> (ntohs (addr_->sin_port)));
+    zmq_assert (port_len > 0 && port_len < 6);
 
     const size_t name_len = strlen (name);
     const int size = static_cast<int> (name_len) + 1 /* colon */
@@ -471,7 +444,16 @@ void zmq::udp_engine_t::out_event ()
         } else {
             size = group_size + body_size + 1;
 
-            // TODO: check if larger than maximum size
+            if (size > MAX_UDP_MSG) {
+                rc = group_msg.close ();
+                errno_assert (rc == 0);
+
+                rc = body_msg.close ();
+                errno_assert (rc == 0);
+
+                return;
+            }
+
             _out_buffer[0] = static_cast<unsigned char> (group_size);
             memcpy (_out_buffer + 1, group_msg.data (), group_size);
             memcpy (_out_buffer + 1 + group_size, body_msg.data (), body_size);
@@ -565,10 +547,8 @@ void zmq::udp_engine_t::in_event ()
         body_size = nbytes;
         body_offset = 0;
     } else {
-        // TODO in out_event, the group size is an *unsigned* char. what is
-        // the maximum value?
         const char *group_buffer = _in_buffer + 1;
-        const int group_size = _in_buffer[0];
+        const int group_size = static_cast<unsigned char> (_in_buffer[0]);
 
         rc = msg.init_size (group_size);
         errno_assert (rc == 0);
@@ -576,8 +556,11 @@ void zmq::udp_engine_t::in_event ()
         memcpy (msg.data (), group_buffer, group_size);
 
         //  This doesn't fit, just ignore
-        if (nbytes - 1 < group_size)
+        if (nbytes - 1 < group_size) {
+            rc = msg.close ();
+            errno_assert (rc == 0);
             return;
+        }
 
         body_size = nbytes - 1 - group_size;
         body_offset = 1 + group_size;

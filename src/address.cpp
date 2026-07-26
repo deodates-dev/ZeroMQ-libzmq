@@ -1,31 +1,4 @@
-/*
-    Copyright (c) 2007-2016 Contributors as noted in the AUTHORS file
-
-    This file is part of libzmq, the ZeroMQ core engine in C++.
-
-    libzmq is free software; you can redistribute it and/or modify it under
-    the terms of the GNU Lesser General Public License (LGPL) as published
-    by the Free Software Foundation; either version 3 of the License, or
-    (at your option) any later version.
-
-    As a special exception, the Contributors give you permission to link
-    this library with independent modules to produce an executable,
-    regardless of the license terms of these independent modules, and to
-    copy and distribute the resulting executable under terms of your choice,
-    provided that you also meet, for each linked independent module, the
-    terms and conditions of the license of that module. An independent
-    module is a module which is not derived from or based on this library.
-    If you modify this library, you must extend this exception to your
-    version of the library.
-
-    libzmq is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-    License for more details.
-
-    You should have received a copy of the GNU Lesser General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* SPDX-License-Identifier: MPL-2.0 */
 
 #include "precompiled.hpp"
 #include "macros.hpp"
@@ -37,6 +10,17 @@
 #include "ipc_address.hpp"
 #include "tipc_address.hpp"
 #include "ws_address.hpp"
+
+#if defined ZMQ_HAVE_VSOCK
+// fix header conflict with VMCI
+#define sockaddr_vm linux_sockaddr_vm
+#define VMADDR_PORT_ANY LINUX_VMADDR_PORT_ANY
+#define VMADDR_CID_ANY LINUX_VMADDR_CID_ANY
+#include "vsock_address.hpp"
+#undef sockaddr_vm
+#undef VMADDR_CID_ANY
+#undef VMADDR_PORT_ANY
+#endif
 
 #if defined ZMQ_HAVE_VMCI
 #include "vmci_address.hpp"
@@ -87,6 +71,11 @@ zmq::address_t::~address_t ()
         LIBZMQ_DELETE (resolved.vmci_addr);
     }
 #endif
+#if defined ZMQ_HAVE_VSOCK
+    else if (protocol == protocol_name::vsock) {
+        LIBZMQ_DELETE (resolved.vsock_addr);
+    }
+#endif
 }
 
 int zmq::address_t::to_string (std::string &addr_) const
@@ -114,6 +103,10 @@ int zmq::address_t::to_string (std::string &addr_) const
 #if defined ZMQ_HAVE_VMCI
     if (protocol == protocol_name::vmci && resolved.vmci_addr)
         return resolved.vmci_addr->to_string (addr_);
+#endif
+#if defined ZMQ_HAVE_VSOCK
+    if (protocol == protocol_name::vsock && resolved.vsock_addr)
+        return resolved.vsock_addr->to_string (addr_);
 #endif
 
     if (!protocol.empty () && !address.empty ()) {

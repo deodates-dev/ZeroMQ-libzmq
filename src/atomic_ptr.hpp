@@ -1,31 +1,4 @@
-/*
-    Copyright (c) 2007-2016 Contributors as noted in the AUTHORS file
-
-    This file is part of libzmq, the ZeroMQ core engine in C++.
-
-    libzmq is free software; you can redistribute it and/or modify it under
-    the terms of the GNU Lesser General Public License (LGPL) as published
-    by the Free Software Foundation; either version 3 of the License, or
-    (at your option) any later version.
-
-    As a special exception, the Contributors give you permission to link
-    this library with independent modules to produce an executable,
-    regardless of the license terms of these independent modules, and to
-    copy and distribute the resulting executable under terms of your choice,
-    provided that you also meet, for each linked independent module, the
-    terms and conditions of the license of that module. An independent
-    module is a module which is not derived from or based on this library.
-    If you modify this library, you must extend this exception to your
-    version of the library.
-
-    libzmq is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-    License for more details.
-
-    You should have received a copy of the GNU Lesser General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* SPDX-License-Identifier: MPL-2.0 */
 
 #ifndef __ZMQ_ATOMIC_PTR_HPP_INCLUDED__
 #define __ZMQ_ATOMIC_PTR_HPP_INCLUDED__
@@ -87,22 +60,22 @@ inline void *atomic_xchg_ptr (void **ptr_,
     return arch_atomic_exchange (ptr_, val_);
 #elif defined ZMQ_ATOMIC_PTR_X86
     void *old;
-    __asm__ volatile("lock; xchg %0, %2"
-                     : "=r"(old), "=m"(*ptr_)
-                     : "m"(*ptr_), "0"(val_));
+    __asm__ volatile ("lock; xchg %0, %2"
+                      : "=r"(old), "=m"(*ptr_)
+                      : "m"(*ptr_), "0"(val_));
     return old;
 #elif defined ZMQ_ATOMIC_PTR_ARM
     void *old;
     unsigned int flag;
-    __asm__ volatile("       dmb     sy\n\t"
-                     "1:     ldrex   %1, [%3]\n\t"
-                     "       strex   %0, %4, [%3]\n\t"
-                     "       teq     %0, #0\n\t"
-                     "       bne     1b\n\t"
-                     "       dmb     sy\n\t"
-                     : "=&r"(flag), "=&r"(old), "+Qo"(*ptr_)
-                     : "r"(ptr_), "r"(val_)
-                     : "cc");
+    __asm__ volatile ("       dmb     sy\n\t"
+                      "1:     ldrex   %1, [%3]\n\t"
+                      "       strex   %0, %4, [%3]\n\t"
+                      "       teq     %0, #0\n\t"
+                      "       bne     1b\n\t"
+                      "       dmb     sy\n\t"
+                      : "=&r"(flag), "=&r"(old), "+Qo"(*ptr_)
+                      : "r"(ptr_), "r"(val_)
+                      : "cc");
     return old;
 #elif defined ZMQ_ATOMIC_PTR_MUTEX
     _sync.lock ();
@@ -138,26 +111,26 @@ inline void *atomic_cas (void *volatile *ptr_,
     return arch_atomic_val_compare_and_exchange (ptr_, cmp_, val_);
 #elif defined ZMQ_ATOMIC_PTR_X86
     void *old;
-    __asm__ volatile("lock; cmpxchg %2, %3"
-                     : "=a"(old), "=m"(*ptr_)
-                     : "r"(val_), "m"(*ptr_), "0"(cmp_)
-                     : "cc");
+    __asm__ volatile ("lock; cmpxchg %2, %3"
+                      : "=a"(old), "=m"(*ptr_)
+                      : "r"(val_), "m"(*ptr_), "0"(cmp_)
+                      : "cc");
     return old;
 #elif defined ZMQ_ATOMIC_PTR_ARM
     void *old;
     unsigned int flag;
-    __asm__ volatile("       dmb     sy\n\t"
-                     "1:     ldrex   %1, [%3]\n\t"
-                     "       mov     %0, #0\n\t"
-                     "       teq     %1, %4\n\t"
-                     "       it      eq\n\t"
-                     "       strexeq %0, %5, [%3]\n\t"
-                     "       teq     %0, #0\n\t"
-                     "       bne     1b\n\t"
-                     "       dmb     sy\n\t"
-                     : "=&r"(flag), "=&r"(old), "+Qo"(*ptr_)
-                     : "r"(ptr_), "r"(cmp_), "r"(val_)
-                     : "cc");
+    __asm__ volatile ("       dmb     sy\n\t"
+                      "1:     ldrex   %1, [%3]\n\t"
+                      "       mov     %0, #0\n\t"
+                      "       teq     %1, %4\n\t"
+                      "       it      eq\n\t"
+                      "       strexeq %0, %5, [%3]\n\t"
+                      "       teq     %0, #0\n\t"
+                      "       bne     1b\n\t"
+                      "       dmb     sy\n\t"
+                      : "=&r"(flag), "=&r"(old), "+Qo"(*ptr_)
+                      : "r"(ptr_), "r"(cmp_), "r"(val_)
+                      : "cc");
     return old;
 #elif defined ZMQ_ATOMIC_PTR_MUTEX
     _sync.lock ();
